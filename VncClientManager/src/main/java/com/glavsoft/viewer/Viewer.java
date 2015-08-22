@@ -71,12 +71,27 @@ public class Viewer extends JApplet implements Runnable, WindowListener {
         SwingUtilities.invokeLater(viewer);
     }
 
-    public static void open() {
-        Parser parser = new Parser();
-        ParametersHandler.completeParserOptions(parser);
-        Viewer viewer = new Viewer(parser);
-        viewer.systemExit = false;
-        SwingUtilities.invokeLater(viewer);
+    public static void open(String host, String port, String password) {
+        if (host != null && port != null && password != null) {
+            Parser parser = new Parser();
+            ParametersHandler.completeParserOptions(parser);
+            String [] args = new String[3];
+            args[0] = "-host="+host;
+            args[1] = "-port="+port;
+            args[2] = "-password="+password;
+            parser.parse(args);
+            if (parser.isSet(ParametersHandler.ARG_HELP)) {
+                printUsage(parser.optionsUsage());
+                System.exit(0);
+            }
+            Viewer viewer = new Viewer(parser);
+            viewer.systemExit = false;
+            SwingUtilities.invokeLater(viewer);
+        } else {
+            Viewer viewer = new Viewer();
+            viewer.systemExit = false;
+            SwingUtilities.invokeLater(viewer);
+        }
     }
 
     public static void printUsage(String additional) {
@@ -155,8 +170,8 @@ public class Viewer extends JApplet implements Runnable, WindowListener {
                 stop();
             }
         } else {
-            if(systemExit){
-                System.exit(0);                
+            if (systemExit) {
+                System.exit(0);
             }
         }
     }

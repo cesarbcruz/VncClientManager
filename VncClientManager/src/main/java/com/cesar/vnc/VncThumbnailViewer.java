@@ -204,7 +204,7 @@ public class VncThumbnailViewer extends Frame
         v.vc.scaledWidth = (fbWidth * sf + 50) / 100;
         v.vc.scaledHeight = (fbHeight * sf + 50) / 100;
 
-    //Fix: invoke a re-paint of canvas?
+        //Fix: invoke a re-paint of canvas?
         //Fix: invoke a re-size of canvas?
         //Fix: invoke a validate of viewer's gridbag?
     }
@@ -378,6 +378,12 @@ public class VncThumbnailViewer extends Frame
             if (c instanceof VncCanvas) {
                 soloHost(((VncCanvas) c).viewer);
             }
+        } else if (evt.getClickCount() == 1) {
+            Component c = evt.getComponent();
+            if (c instanceof VncCanvas) {
+                VncViewer vnc = ((VncCanvas) c).viewer;
+                Viewer.open(vnc.host, String.valueOf(vnc.port), vnc.passwordParam);
+            }
         }
 
     }
@@ -427,7 +433,7 @@ public class VncThumbnailViewer extends Frame
             hostDialog = new AddHostDialog(this);
         }
         if (evt.getSource() == connectHostOnlyMenuItem) {
-            Viewer.open();
+            Viewer.open(null, null, null);
         }
         if (evt.getSource() == savehostsMenuItem) {
             loadsaveHosts(FileDialog.SAVE);
