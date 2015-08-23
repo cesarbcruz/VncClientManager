@@ -33,6 +33,9 @@ import java.io.*;
 import java.util.*;
 import java.lang.Math.*;
 import java.net.*;
+import javax.swing.JDialog;
+import javax.swing.JOptionPane;
+import javax.swing.plaf.OptionPaneUI;
 
 public class VncThumbnailViewer extends Frame
         implements WindowListener, ComponentListener, ContainerListener, MouseListener, ActionListener {
@@ -374,18 +377,23 @@ public class VncThumbnailViewer extends Frame
     // Mouse Listener Events:
     public void mouseClicked(MouseEvent evt) {
         if (evt.getClickCount() == 2) {
-            Component c = evt.getComponent();
-            if (c instanceof VncCanvas) {
-                soloHost(((VncCanvas) c).viewer);
-            }
-        } else if (evt.getClickCount() == 1) {
-            Component c = evt.getComponent();
-            if (c instanceof VncCanvas) {
-                VncViewer vnc = ((VncCanvas) c).viewer;
-                Viewer.open(vnc.host, String.valueOf(vnc.port), vnc.passwordParam);
+            String[] options = new String[]{"Default Viewer", "TightVNC Viewer", "Cancel"};
+            int response = JOptionPane.showOptionDialog(null, "Select an option...", "Options",
+                    JOptionPane.DEFAULT_OPTION, JOptionPane.PLAIN_MESSAGE,
+                    null, options, options[0]);
+            if (response == 0) {
+                Component c = evt.getComponent();
+                if (c instanceof VncCanvas) {
+                    soloHost(((VncCanvas) c).viewer);
+                }
+            } else if (response == 1) {
+                Component c = evt.getComponent();
+                if (c instanceof VncCanvas) {
+                    VncViewer vnc = ((VncCanvas) c).viewer;
+                    Viewer.open(vnc.host, String.valueOf(vnc.port), vnc.passwordParam);
+                }
             }
         }
-
     }
 
     public void mouseEntered(MouseEvent evt) {

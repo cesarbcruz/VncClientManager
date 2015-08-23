@@ -13,20 +13,22 @@ public class SwingViewerWindowFactory {
 
     private final boolean isSeparateFrame;
     private final boolean isApplet;
+    private final boolean systemExit;
     private final Viewer viewer;
 
-    public SwingViewerWindowFactory(boolean isSeparateFrame, boolean isApplet, Viewer viewer) {
+    public SwingViewerWindowFactory(boolean isSeparateFrame, boolean isApplet, boolean systemExit, Viewer viewer) {
         this.isSeparateFrame = isSeparateFrame;
         this.isApplet = isApplet;
+        this.systemExit = systemExit;
         this.viewer = viewer;
     }
 
     public SwingViewerWindow createViewerWindow(Protocol workingProtocol,
-                                                ProtocolSettings rfbSettings, UiSettings uiSettings,
-                                                String connectionString, ConnectionPresenter presenter) {
+            ProtocolSettings rfbSettings, UiSettings uiSettings,
+            String connectionString, ConnectionPresenter presenter) {
         Surface surface = new Surface(workingProtocol, uiSettings.getScaleFactor(), uiSettings.getMouseCursorShape());
         final SwingViewerWindow viewerWindow = new SwingViewerWindow(workingProtocol, rfbSettings, uiSettings,
-                surface, isSeparateFrame, isApplet, viewer, connectionString, presenter);
+                surface, isSeparateFrame, isApplet, systemExit, viewer, connectionString, presenter);
         surface.setViewerWindow(viewerWindow);
         viewerWindow.setRemoteDesktopName(workingProtocol.getRemoteDesktopName());
         rfbSettings.addListener(viewerWindow);

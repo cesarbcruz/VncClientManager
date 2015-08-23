@@ -21,7 +21,6 @@
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 //-------------------------------------------------------------------------
 //
-
 package com.glavsoft.viewer.swing;
 
 import com.glavsoft.core.SettingsChangedEvent;
@@ -51,28 +50,30 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
 public class SwingViewerWindow implements IChangeSettingsListener {
-	public static final int FS_SCROLLING_ACTIVE_BORDER = 20;
-	private JToggleButton zoomFitButton;
-	private JToggleButton zoomFullScreenButton;
-	private JButton zoomInButton;
-	private JButton zoomOutButton;
-	private JButton zoomAsIsButton;
-	private JPanel outerPanel;
-	private JScrollPane scroller;
-	private JFrame frame;
-	private boolean forceResizable = true;
-	private ButtonsBar buttonsBar;
-	private Surface surface;
-	private boolean isSeparateFrame;
+
+    public static final int FS_SCROLLING_ACTIVE_BORDER = 20;
+    private JToggleButton zoomFitButton;
+    private JToggleButton zoomFullScreenButton;
+    private JButton zoomInButton;
+    private JButton zoomOutButton;
+    private JButton zoomAsIsButton;
+    private JPanel outerPanel;
+    private JScrollPane scroller;
+    private JFrame frame;
+    private boolean forceResizable = true;
+    private ButtonsBar buttonsBar;
+    private Surface surface;
+    private boolean isSeparateFrame;
     private final boolean isApplet;
+    private final boolean systemExit;
     private Viewer viewer;
     private String connectionString;
     private ConnectionPresenter presenter;
     private Rectangle oldContainerBounds;
-	private volatile boolean isFullScreen;
-	private Border oldScrollerBorder;
-	private JLayeredPane lpane;
-	private EmptyButtonsBarMouseAdapter buttonsBarMouseAdapter;
+    private volatile boolean isFullScreen;
+    private Border oldScrollerBorder;
+    private JLayeredPane lpane;
+    private EmptyButtonsBarMouseAdapter buttonsBarMouseAdapter;
     private String remoteDesktopName;
     private ProtocolSettings rfbSettings;
     private UiSettings uiSettings;
@@ -82,22 +83,25 @@ public class SwingViewerWindow implements IChangeSettingsListener {
     private List<JComponent> kbdButtons;
 
     public SwingViewerWindow(Protocol workingProtocol, ProtocolSettings rfbSettings, UiSettings uiSettings, Surface surface,
-                             boolean isSeparateFrame, boolean isApplet, Viewer viewer, String connectionString,
-                             ConnectionPresenter presenter) {
+            boolean isSeparateFrame, boolean isApplet, boolean systemExit, Viewer viewer, String connectionString,
+            ConnectionPresenter presenter) {
         this.workingProtocol = workingProtocol;
         this.rfbSettings = rfbSettings;
         this.uiSettings = uiSettings;
         this.surface = surface;
         this.isSeparateFrame = isSeparateFrame;
         this.isApplet = isApplet;
+        this.systemExit = systemExit;
         this.viewer = viewer;
         this.connectionString = connectionString;
         this.presenter = presenter;
-        createContainer(surface, isApplet, viewer);
+        createContainer(surface, isApplet, systemExit, viewer);
 
         if (uiSettings.showControls) {
-            createButtonsPanel(workingProtocol, isSeparateFrame? frame: viewer);
-            if (isSeparateFrame) registerResizeListener(frame);
+            createButtonsPanel(workingProtocol, isSeparateFrame ? frame : viewer);
+            if (isSeparateFrame) {
+                registerResizeListener(frame);
+            }
             updateZoomButtonsState();
         }
         if (uiSettings.isFullScreen()) {
@@ -122,42 +126,46 @@ public class SwingViewerWindow implements IChangeSettingsListener {
                 }
             }).start();
         }
-	}
+    }
 
-	private void createContainer(final Surface surface, boolean isApplet, JApplet appletWindow) {
-		outerPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0)) {
-			@Override
-			public Dimension getSize() {
-				return surface.getPreferredSize();
-			}
-			@Override
-			public Dimension getPreferredSize() {
-				return surface.getPreferredSize();
-			}
-		};
+    private void createContainer(final Surface surface, boolean isApplet, boolean systemExit, JApplet appletWindow) {
+        outerPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0)) {
+            @Override
+            public Dimension getSize() {
+                return surface.getPreferredSize();
+            }
+
+            @Override
+            public Dimension getPreferredSize() {
+                return surface.getPreferredSize();
+            }
+        };
         outerPanel.setBackground(Color.DARK_GRAY);
-		lpane = new JLayeredPane() {
-			@Override
-			public Dimension getSize() {
-				return surface.getPreferredSize();
-			}
-			@Override
-			public Dimension getPreferredSize() {
-				return surface.getPreferredSize();
-			}
-		};
-		lpane.setPreferredSize(surface.getPreferredSize());
-		lpane.add(surface, JLayeredPane.DEFAULT_LAYER, 0);
-		outerPanel.add(lpane);
+        lpane = new JLayeredPane() {
+            @Override
+            public Dimension getSize() {
+                return surface.getPreferredSize();
+            }
 
-		scroller = new JScrollPane(outerPanel);
-		if (isSeparateFrame) {
-			frame = new JFrame();
-			if ( ! isApplet) {
-				frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
-			}
+            @Override
+            public Dimension getPreferredSize() {
+                return surface.getPreferredSize();
+            }
+        };
+        lpane.setPreferredSize(surface.getPreferredSize());
+        lpane.add(surface, JLayeredPane.DEFAULT_LAYER, 0);
+        outerPanel.add(lpane);
+
+        scroller = new JScrollPane(outerPanel);
+        if (isSeparateFrame) {
+            frame = new JFrame();
+            if (!isApplet && systemExit) {
+                frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+            } else {
+                frame.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+            }
             frame.setModalExclusionType(Dialog.ModalExclusionType.APPLICATION_EXCLUDE);
-			Utils.setApplicationIconsForWindow(frame);
+            Utils.setApplicationIconsForWindow(frame);
             frame.setLayout(new BorderLayout(0, 0));
             frame.add(scroller, BorderLayout.CENTER);
 
@@ -166,24 +174,24 @@ public class SwingViewerWindow implements IChangeSettingsListener {
             internalPack(null);
             frame.setVisible(true);
             frame.validate();
-		} else {
+        } else {
             appletWindow.setLayout(new BorderLayout(0, 0));
             appletWindow.add(scroller, BorderLayout.CENTER);
             appletWindow.validate();
-		}
-	}
+        }
+    }
 
-	public void pack() {
-		final Dimension outerPanelOldSize = outerPanel.getSize();
-		outerPanel.setSize(surface.getPreferredSize());
-		if (isSeparateFrame && ! isZoomToFitSelected()) {
-			internalPack(outerPanelOldSize);
-		}
+    public void pack() {
+        final Dimension outerPanelOldSize = outerPanel.getSize();
+        outerPanel.setSize(surface.getPreferredSize());
+        if (isSeparateFrame && !isZoomToFitSelected()) {
+            internalPack(outerPanelOldSize);
+        }
         if (buttonsBar != null) {
             updateZoomButtonsState();
         }
         updateWindowTitle();
-	}
+    }
 
     public boolean isZoomToFitSelected() {
         return isZoomToFitSelected;
@@ -200,294 +208,304 @@ public class SwingViewerWindow implements IChangeSettingsListener {
 
     private void updateWindowTitle() {
         if (isSeparateFrame) {
-			frame.setTitle(remoteDesktopName + " [zoom: " + uiSettings.getScalePercentFormatted() + "%]");
-		}
+            frame.setTitle(remoteDesktopName + " [zoom: " + uiSettings.getScalePercentFormatted() + "%]");
+        }
     }
 
-	private void internalPack(Dimension outerPanelOldSize) {
-		final Rectangle workareaRectangle = getWorkareaRectangle();
-		if (workareaRectangle.equals(frame.getBounds())) {
-			forceResizable = true;
-		}
-		final boolean isHScrollBar = scroller.getHorizontalScrollBar().isShowing() && ! forceResizable;
-		final boolean isVScrollBar = scroller.getVerticalScrollBar().isShowing() && ! forceResizable;
+    private void internalPack(Dimension outerPanelOldSize) {
+        final Rectangle workareaRectangle = getWorkareaRectangle();
+        if (workareaRectangle.equals(frame.getBounds())) {
+            forceResizable = true;
+        }
+        final boolean isHScrollBar = scroller.getHorizontalScrollBar().isShowing() && !forceResizable;
+        final boolean isVScrollBar = scroller.getVerticalScrollBar().isShowing() && !forceResizable;
 
-		boolean isWidthChangeable = true;
-		boolean isHeightChangeable = true;
-		if (outerPanelOldSize != null && surface.oldSize != null) {
-			isWidthChangeable = forceResizable ||
-					(outerPanelOldSize.width == surface.oldSize.width && ! isHScrollBar);
-			isHeightChangeable = forceResizable ||
-					(outerPanelOldSize.height == surface.oldSize.height && ! isVScrollBar);
-		}
-		forceResizable = false;
-		frame.validate();
+        boolean isWidthChangeable = true;
+        boolean isHeightChangeable = true;
+        if (outerPanelOldSize != null && surface.oldSize != null) {
+            isWidthChangeable = forceResizable
+                    || (outerPanelOldSize.width == surface.oldSize.width && !isHScrollBar);
+            isHeightChangeable = forceResizable
+                    || (outerPanelOldSize.height == surface.oldSize.height && !isVScrollBar);
+        }
+        forceResizable = false;
+        frame.validate();
 
-		final Insets containerInsets = frame.getInsets();
-		Dimension preferredSize = frame.getPreferredSize();
-		Rectangle preferredRectangle = new Rectangle(frame.getLocation(), preferredSize);
+        final Insets containerInsets = frame.getInsets();
+        Dimension preferredSize = frame.getPreferredSize();
+        Rectangle preferredRectangle = new Rectangle(frame.getLocation(), preferredSize);
 
-		if (null == outerPanelOldSize && workareaRectangle.contains(preferredRectangle)) {
-			frame.pack();
-		} else {
-			Dimension minDimension = new Dimension(
-					containerInsets.left + containerInsets.right, containerInsets.top + containerInsets.bottom);
-			if (buttonsBar != null && buttonsBar.isVisible) {
-				minDimension.width += buttonsBar.getWidth();
-				minDimension.height += buttonsBar.getHeight();
-			}
-			Dimension dim = new Dimension(preferredSize);
-			Point location = frame.getLocation();
-			if ( ! isWidthChangeable) {
-				dim.width = frame.getWidth();
-			} else {
-				if (isVScrollBar) dim.width += scroller.getVerticalScrollBar().getWidth();
-				if (dim.width < minDimension.width) dim.width = minDimension.width;
+        if (null == outerPanelOldSize && workareaRectangle.contains(preferredRectangle)) {
+            frame.pack();
+        } else {
+            Dimension minDimension = new Dimension(
+                    containerInsets.left + containerInsets.right, containerInsets.top + containerInsets.bottom);
+            if (buttonsBar != null && buttonsBar.isVisible) {
+                minDimension.width += buttonsBar.getWidth();
+                minDimension.height += buttonsBar.getHeight();
+            }
+            Dimension dim = new Dimension(preferredSize);
+            Point location = frame.getLocation();
+            if (!isWidthChangeable) {
+                dim.width = frame.getWidth();
+            } else {
+                if (isVScrollBar) {
+                    dim.width += scroller.getVerticalScrollBar().getWidth();
+                }
+                if (dim.width < minDimension.width) {
+                    dim.width = minDimension.width;
+                }
 
-				int dx = location.x - workareaRectangle.x;
-				if (dx < 0) {
-					dx = 0;
-					location.x = workareaRectangle.x;
-				}
-				int w = workareaRectangle.width - dx;
-				if (w < dim.width) {
-					int dw = dim.width - w;
-					if (dw < dx) {
-						location.x -= dw;
-					} else {
-						dim.width = workareaRectangle.width;
-						location.x = workareaRectangle.x;
-					}
-				}
-			}
-			if ( ! isHeightChangeable) {
-				dim.height = frame.getHeight();
-			} else {
+                int dx = location.x - workareaRectangle.x;
+                if (dx < 0) {
+                    dx = 0;
+                    location.x = workareaRectangle.x;
+                }
+                int w = workareaRectangle.width - dx;
+                if (w < dim.width) {
+                    int dw = dim.width - w;
+                    if (dw < dx) {
+                        location.x -= dw;
+                    } else {
+                        dim.width = workareaRectangle.width;
+                        location.x = workareaRectangle.x;
+                    }
+                }
+            }
+            if (!isHeightChangeable) {
+                dim.height = frame.getHeight();
+            } else {
 
-				if (isHScrollBar) dim.height += scroller.getHorizontalScrollBar().getHeight();
-				if (dim.height < minDimension.height) dim.height = minDimension.height;
+                if (isHScrollBar) {
+                    dim.height += scroller.getHorizontalScrollBar().getHeight();
+                }
+                if (dim.height < minDimension.height) {
+                    dim.height = minDimension.height;
+                }
 
-				int dy = location.y - workareaRectangle.y;
-				if (dy < 0) {
-					dy = 0;
-					location.y = workareaRectangle.y;
-				}
-				int h = workareaRectangle.height - dy;
-				if (h < dim.height) {
-					int dh = dim.height - h;
-					if (dh < dy) {
-						location.y -= dh;
-					} else {
-						dim.height = workareaRectangle.height;
-						location.y = workareaRectangle.y;
-					}
-				}
-			}
-			if ( ! location.equals(frame.getLocation())) {
-				frame.setLocation(location);
-			}
-			if ( ! isFullScreen ) {
-				frame.setSize(dim);
-			}
-		}
-		scroller.revalidate();
-	}
+                int dy = location.y - workareaRectangle.y;
+                if (dy < 0) {
+                    dy = 0;
+                    location.y = workareaRectangle.y;
+                }
+                int h = workareaRectangle.height - dy;
+                if (h < dim.height) {
+                    int dh = dim.height - h;
+                    if (dh < dy) {
+                        location.y -= dh;
+                    } else {
+                        dim.height = workareaRectangle.height;
+                        location.y = workareaRectangle.y;
+                    }
+                }
+            }
+            if (!location.equals(frame.getLocation())) {
+                frame.setLocation(location);
+            }
+            if (!isFullScreen) {
+                frame.setSize(dim);
+            }
+        }
+        scroller.revalidate();
+    }
 
-	private Rectangle getWorkareaRectangle() {
-		final GraphicsConfiguration graphicsConfiguration = frame.getGraphicsConfiguration();
-		final Rectangle screenBounds = graphicsConfiguration.getBounds();
-		final Insets screenInsets = Toolkit.getDefaultToolkit().getScreenInsets(graphicsConfiguration);
+    private Rectangle getWorkareaRectangle() {
+        final GraphicsConfiguration graphicsConfiguration = frame.getGraphicsConfiguration();
+        final Rectangle screenBounds = graphicsConfiguration.getBounds();
+        final Insets screenInsets = Toolkit.getDefaultToolkit().getScreenInsets(graphicsConfiguration);
 
-		screenBounds.x += screenInsets.left;
-		screenBounds.y += screenInsets.top;
-		screenBounds.width -= screenInsets.left + screenInsets.right;
-		screenBounds.height -= screenInsets.top + screenInsets.bottom;
-		return screenBounds;
-	}
+        screenBounds.x += screenInsets.left;
+        screenBounds.y += screenInsets.top;
+        screenBounds.width -= screenInsets.left + screenInsets.right;
+        screenBounds.height -= screenInsets.top + screenInsets.bottom;
+        return screenBounds;
+    }
 
-	void addZoomButtons() {
-		buttonsBar.createStrut();
-		zoomOutButton = buttonsBar.createButton("zoom-out", "Zoom Out", new ActionListener() {
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				zoomFitButton.setSelected(false);
+    void addZoomButtons() {
+        buttonsBar.createStrut();
+        zoomOutButton = buttonsBar.createButton("zoom-out", "Zoom Out", new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                zoomFitButton.setSelected(false);
                 uiSettings.zoomOut();
-			}
-		});
-		zoomInButton = buttonsBar.createButton("zoom-in", "Zoom In", new ActionListener() {
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				zoomFitButton.setSelected(false);
+            }
+        });
+        zoomInButton = buttonsBar.createButton("zoom-in", "Zoom In", new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                zoomFitButton.setSelected(false);
                 uiSettings.zoomIn();
-			}
-		});
-		zoomAsIsButton = buttonsBar.createButton("zoom-100", "Zoom 100%", new ActionListener() {
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				zoomFitButton.setSelected(false);
-				forceResizable = false;
+            }
+        });
+        zoomAsIsButton = buttonsBar.createButton("zoom-100", "Zoom 100%", new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                zoomFitButton.setSelected(false);
+                forceResizable = false;
                 uiSettings.zoomAsIs();
-			}
-		});
+            }
+        });
 
-		zoomFitButton = buttonsBar.createToggleButton("zoom-fit", "Zoom to Fit Window",
-				new ItemListener() {
-					@Override
-					public void itemStateChanged(ItemEvent e) {
-						if (e.getStateChange() == ItemEvent.SELECTED) {
-							setZoomToFitSelected(true);
-							forceResizable = true;
-							zoomToFit();
-							updateZoomButtonsState();
-						} else {
-							setZoomToFitSelected(false);
-						}
-						setSurfaceToHandleKbdFocus();
-					}
-				});
+        zoomFitButton = buttonsBar.createToggleButton("zoom-fit", "Zoom to Fit Window",
+                new ItemListener() {
+                    @Override
+                    public void itemStateChanged(ItemEvent e) {
+                        if (e.getStateChange() == ItemEvent.SELECTED) {
+                            setZoomToFitSelected(true);
+                            forceResizable = true;
+                            zoomToFit();
+                            updateZoomButtonsState();
+                        } else {
+                            setZoomToFitSelected(false);
+                        }
+                        setSurfaceToHandleKbdFocus();
+                    }
+                });
 
-		zoomFullScreenButton = buttonsBar.createToggleButton("zoom-fullscreen", "Full Screen",
-			new ItemListener() {
-				@Override
-				public void itemStateChanged(ItemEvent e) {
-					updateZoomButtonsState();
-					if (e.getStateChange() == ItemEvent.SELECTED) {
-                        uiSettings.setFullScreen(switchOnFullscreenMode());
-					} else {
-						switchOffFullscreenMode();
-                        uiSettings.setFullScreen(false);
-					}
-					setSurfaceToHandleKbdFocus();
-				}
-			});
-			if ( ! isSeparateFrame) {
-				zoomFullScreenButton.setEnabled(false);
-				zoomFitButton.setEnabled(false);
-			}
-		}
+        zoomFullScreenButton = buttonsBar.createToggleButton("zoom-fullscreen", "Full Screen",
+                new ItemListener() {
+                    @Override
+                    public void itemStateChanged(ItemEvent e) {
+                        updateZoomButtonsState();
+                        if (e.getStateChange() == ItemEvent.SELECTED) {
+                            uiSettings.setFullScreen(switchOnFullscreenMode());
+                        } else {
+                            switchOffFullscreenMode();
+                            uiSettings.setFullScreen(false);
+                        }
+                        setSurfaceToHandleKbdFocus();
+                    }
+                });
+        if (!isSeparateFrame) {
+            zoomFullScreenButton.setEnabled(false);
+            zoomFitButton.setEnabled(false);
+        }
+    }
 
     protected void setSurfaceToHandleKbdFocus() {
-        if (surface != null && ! surface.requestFocusInWindow()) {
+        if (surface != null && !surface.requestFocusInWindow()) {
             surface.requestFocus();
         }
     }
 
     boolean switchOnFullscreenMode() {
-		zoomFullScreenButton.setSelected(true);
-		oldContainerBounds = frame.getBounds();
-		setButtonsBarVisible(false);
-		forceResizable = true;
-		frame.dispose();
-		frame.setUndecorated(true);
-		frame.setResizable(false);
-		frame.setVisible(true);
-		try {
-			frame.getGraphicsConfiguration().getDevice().setFullScreenWindow(frame);
-			isFullScreen = true;
-			scroller.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_NEVER);
-			scroller.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
-			oldScrollerBorder = scroller.getBorder();
-			scroller.setBorder(new EmptyBorder(0, 0, 0, 0));
-			new FullscreenBorderDetectionThread(frame).start();
-		} catch (Exception ex) {
+        zoomFullScreenButton.setSelected(true);
+        oldContainerBounds = frame.getBounds();
+        setButtonsBarVisible(false);
+        forceResizable = true;
+        frame.dispose();
+        frame.setUndecorated(true);
+        frame.setResizable(false);
+        frame.setVisible(true);
+        try {
+            frame.getGraphicsConfiguration().getDevice().setFullScreenWindow(frame);
+            isFullScreen = true;
+            scroller.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_NEVER);
+            scroller.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+            oldScrollerBorder = scroller.getBorder();
+            scroller.setBorder(new EmptyBorder(0, 0, 0, 0));
+            new FullscreenBorderDetectionThread(frame).start();
+        } catch (Exception ex) {
             Logger.getLogger(this.getClass().getName()).info("Cannot switch into FullScreen mode: " + ex.getMessage());
-			return false;
-		}
+            return false;
+        }
         return true;
-	}
+    }
 
-	private void switchOffFullscreenMode() {
-		if (isFullScreen) {
-			zoomFullScreenButton.setSelected(false);
-			isFullScreen = false;
-			setButtonsBarVisible(true);
-			try {
-				frame.dispose();
-				frame.setUndecorated(false);
-				frame.setResizable(true);
-				frame.getGraphicsConfiguration().getDevice().setFullScreenWindow(null);
-			} catch (Exception e) {
-				// nop
-			}
-			scroller.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
-			scroller.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
-			scroller.setBorder(oldScrollerBorder);
-			this.frame.setBounds(oldContainerBounds);
-			frame.setVisible(true);
-			pack();
-		}
-	}
+    private void switchOffFullscreenMode() {
+        if (isFullScreen) {
+            zoomFullScreenButton.setSelected(false);
+            isFullScreen = false;
+            setButtonsBarVisible(true);
+            try {
+                frame.dispose();
+                frame.setUndecorated(false);
+                frame.setResizable(true);
+                frame.getGraphicsConfiguration().getDevice().setFullScreenWindow(null);
+            } catch (Exception e) {
+                // nop
+            }
+            scroller.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
+            scroller.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+            scroller.setBorder(oldScrollerBorder);
+            this.frame.setBounds(oldContainerBounds);
+            frame.setVisible(true);
+            pack();
+        }
+    }
 
-	private void zoomToFit() {
-		Dimension scrollerSize = scroller.getSize();
-		Insets scrollerInsets = scroller.getInsets();
+    private void zoomToFit() {
+        Dimension scrollerSize = scroller.getSize();
+        Insets scrollerInsets = scroller.getInsets();
         uiSettings.zoomToFit(scrollerSize.width - scrollerInsets.left - scrollerInsets.right,
-                scrollerSize.height - scrollerInsets.top - scrollerInsets.bottom +
-                        (isFullScreen ? buttonsBar.getHeight() : 0),
+                scrollerSize.height - scrollerInsets.top - scrollerInsets.bottom
+                + (isFullScreen ? buttonsBar.getHeight() : 0),
                 workingProtocol.getFbWidth(), workingProtocol.getFbHeight());
-	}
+    }
 
-	void registerResizeListener(Container container) {
-		container.addComponentListener(new ComponentAdapter() {
-			@Override
-			public void componentResized(ComponentEvent e) {
-				if (isZoomToFitSelected()) {
-					zoomToFit();
-					updateZoomButtonsState();
-					updateWindowTitle();
-					setSurfaceToHandleKbdFocus();
-				}
-			}
-		});
-	}
+    void registerResizeListener(Container container) {
+        container.addComponentListener(new ComponentAdapter() {
+            @Override
+            public void componentResized(ComponentEvent e) {
+                if (isZoomToFitSelected()) {
+                    zoomToFit();
+                    updateZoomButtonsState();
+                    updateWindowTitle();
+                    setSurfaceToHandleKbdFocus();
+                }
+            }
+        });
+    }
 
-	void updateZoomButtonsState() {
-		zoomOutButton.setEnabled(uiSettings.getScalePercent() > UiSettings.MIN_SCALE_PERCENT);
-		zoomInButton.setEnabled(uiSettings.getScalePercent() < UiSettings.MAX_SCALE_PERCENT);
-		zoomAsIsButton.setEnabled(uiSettings.getScalePercent() != 100);
-	}
+    void updateZoomButtonsState() {
+        zoomOutButton.setEnabled(uiSettings.getScalePercent() > UiSettings.MIN_SCALE_PERCENT);
+        zoomInButton.setEnabled(uiSettings.getScalePercent() < UiSettings.MAX_SCALE_PERCENT);
+        zoomAsIsButton.setEnabled(uiSettings.getScalePercent() != 100);
+    }
 
-	public ButtonsBar createButtonsBar() {
-		buttonsBar = new ButtonsBar();
-		return buttonsBar;
-	}
+    public ButtonsBar createButtonsBar() {
+        buttonsBar = new ButtonsBar();
+        return buttonsBar;
+    }
 
     public void setButtonsBarVisible(boolean isVisible) {
         setButtonsBarVisible(isVisible, frame);
     }
 
-	private void setButtonsBarVisible(boolean isVisible, Container container) {
-		buttonsBar.setVisible(isVisible);
-		if (isVisible) {
-			buttonsBar.borderOff();
-			container.add(buttonsBar.bar, BorderLayout.NORTH);
+    private void setButtonsBarVisible(boolean isVisible, Container container) {
+        buttonsBar.setVisible(isVisible);
+        if (isVisible) {
+            buttonsBar.borderOff();
+            container.add(buttonsBar.bar, BorderLayout.NORTH);
             container.validate();
-		} else {
-			container.remove(buttonsBar.bar);
-			buttonsBar.borderOn();
-		}
-	}
+        } else {
+            container.remove(buttonsBar.bar);
+            buttonsBar.borderOn();
+        }
+    }
 
-	public void setButtonsBarVisibleFS(boolean isVisible) {
-		if (isVisible) {
-			if ( ! buttonsBar.isVisible) {
-				lpane.add(buttonsBar.bar, JLayeredPane.POPUP_LAYER, 0);
-				final int bbWidth = buttonsBar.bar.getPreferredSize().width;
-				buttonsBar.bar.setBounds(
-						scroller.getViewport().getViewPosition().x + (scroller.getWidth() - bbWidth)/2, 0,
-						bbWidth, buttonsBar.bar.getPreferredSize().height);
+    public void setButtonsBarVisibleFS(boolean isVisible) {
+        if (isVisible) {
+            if (!buttonsBar.isVisible) {
+                lpane.add(buttonsBar.bar, JLayeredPane.POPUP_LAYER, 0);
+                final int bbWidth = buttonsBar.bar.getPreferredSize().width;
+                buttonsBar.bar.setBounds(
+                        scroller.getViewport().getViewPosition().x + (scroller.getWidth() - bbWidth) / 2, 0,
+                        bbWidth, buttonsBar.bar.getPreferredSize().height);
 
-				// prevent mouse events to through down to Surface
-				if (null == buttonsBarMouseAdapter) buttonsBarMouseAdapter = new EmptyButtonsBarMouseAdapter();
-				buttonsBar.bar.addMouseListener(buttonsBarMouseAdapter);
-			}
-		} else {
-			buttonsBar.bar.removeMouseListener(buttonsBarMouseAdapter);
-			lpane.remove(buttonsBar.bar);
-			lpane.repaint(buttonsBar.bar.getBounds());
-		}
-		buttonsBar.setVisible(isVisible);
-	}
+                // prevent mouse events to through down to Surface
+                if (null == buttonsBarMouseAdapter) {
+                    buttonsBarMouseAdapter = new EmptyButtonsBarMouseAdapter();
+                }
+                buttonsBar.bar.addMouseListener(buttonsBarMouseAdapter);
+            }
+        } else {
+            buttonsBar.bar.removeMouseListener(buttonsBarMouseAdapter);
+            lpane.remove(buttonsBar.bar);
+            lpane.repaint(buttonsBar.bar.getBounds());
+        }
+        buttonsBar.setVisible(isVisible);
+    }
 
     public Surface getSurface() {
         return surface;
@@ -501,223 +519,247 @@ public class SwingViewerWindow implements IChangeSettingsListener {
     }
 
     public static class ButtonsBar {
-		private static final Insets BUTTONS_MARGIN = new Insets(2, 2, 2, 2);
-		private JPanel bar;
-		private boolean isVisible;
 
-		public ButtonsBar() {
-			bar = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 1));
-		}
+        private static final Insets BUTTONS_MARGIN = new Insets(2, 2, 2, 2);
+        private JPanel bar;
+        private boolean isVisible;
 
-		public JButton createButton(String iconId, String tooltipText, ActionListener actionListener) {
-			JButton button = new JButton(Utils.getButtonIcon(iconId));
-			button.setToolTipText(tooltipText);
-			button.setMargin(BUTTONS_MARGIN);
-			bar.add(button);
-			button.addActionListener(actionListener);
-			return button;
-		}
+        public ButtonsBar() {
+            bar = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 1));
+        }
 
-		public void createStrut() {
-			bar.add(Box.createHorizontalStrut(10));
-		}
+        public JButton createButton(String iconId, String tooltipText, ActionListener actionListener) {
+            JButton button = new JButton(Utils.getButtonIcon(iconId));
+            button.setToolTipText(tooltipText);
+            button.setMargin(BUTTONS_MARGIN);
+            bar.add(button);
+            button.addActionListener(actionListener);
+            return button;
+        }
 
-		public JToggleButton createToggleButton(String iconId, String tooltipText, ItemListener itemListener) {
-			JToggleButton button = new JToggleButton(Utils.getButtonIcon(iconId));
-			button.setToolTipText(tooltipText);
-			button.setMargin(BUTTONS_MARGIN);
-			bar.add(button);
-			button.addItemListener(itemListener);
-			return button;
-		}
+        public void createStrut() {
+            bar.add(Box.createHorizontalStrut(10));
+        }
 
-		public void setVisible(boolean isVisible) {
-			this.isVisible = isVisible;
-            if (isVisible) bar.revalidate();
-		}
+        public JToggleButton createToggleButton(String iconId, String tooltipText, ItemListener itemListener) {
+            JToggleButton button = new JToggleButton(Utils.getButtonIcon(iconId));
+            button.setToolTipText(tooltipText);
+            button.setMargin(BUTTONS_MARGIN);
+            bar.add(button);
+            button.addItemListener(itemListener);
+            return button;
+        }
 
-		public int getWidth() {
-			return bar.getMinimumSize().width;
-		}
-		public int getHeight() {
-			return bar.getMinimumSize().height;
-		}
+        public void setVisible(boolean isVisible) {
+            this.isVisible = isVisible;
+            if (isVisible) {
+                bar.revalidate();
+            }
+        }
 
-		public void borderOn() {
-			bar.setBorder(BorderFactory.createBevelBorder(BevelBorder.RAISED));
-		}
+        public int getWidth() {
+            return bar.getMinimumSize().width;
+        }
 
-		public void borderOff() {
-			bar.setBorder(BorderFactory.createEmptyBorder());
-		}
-	}
+        public int getHeight() {
+            return bar.getMinimumSize().height;
+        }
 
-	private static class EmptyButtonsBarMouseAdapter extends MouseAdapter {
-		// empty
-	}
+        public void borderOn() {
+            bar.setBorder(BorderFactory.createBevelBorder(BevelBorder.RAISED));
+        }
 
-	private class FullscreenBorderDetectionThread extends Thread {
-		public static final int SHOW_HIDE_BUTTONS_BAR_DELAY_IN_MILLS = 700;
-		private final JFrame frame;
-		private ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
-		private ScheduledFuture<?> futureForShow;
-		private ScheduledFuture<?> futureForHide;
-		private Point mousePoint, oldMousePoint;
-		private Point viewPosition;
+        public void borderOff() {
+            bar.setBorder(BorderFactory.createEmptyBorder());
+        }
+    }
 
-		public FullscreenBorderDetectionThread(JFrame frame) {
-			super("FS border detector");
-			this.frame = frame;
-		}
+    private static class EmptyButtonsBarMouseAdapter extends MouseAdapter {
+        // empty
+    }
 
-		public void run() {
-			setPriority(Thread.MIN_PRIORITY);
-			while(isFullScreen) {
-				mousePoint = MouseInfo.getPointerInfo().getLocation();
-				if (null == oldMousePoint) oldMousePoint = mousePoint;
-				SwingUtilities.convertPointFromScreen(mousePoint, frame);
-				viewPosition = scroller.getViewport().getViewPosition();
-				processButtonsBarVisibility();
+    private class FullscreenBorderDetectionThread extends Thread {
 
-				boolean needScrolling = processVScroll() || processHScroll();
-				oldMousePoint = mousePoint;
-				if (needScrolling) {
-					cancelShowExecutor();
-					setButtonsBarVisibleFS(false);
-					makeScrolling(viewPosition);
-				}
-				try {
+        public static final int SHOW_HIDE_BUTTONS_BAR_DELAY_IN_MILLS = 700;
+        private final JFrame frame;
+        private ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+        private ScheduledFuture<?> futureForShow;
+        private ScheduledFuture<?> futureForHide;
+        private Point mousePoint, oldMousePoint;
+        private Point viewPosition;
+
+        public FullscreenBorderDetectionThread(JFrame frame) {
+            super("FS border detector");
+            this.frame = frame;
+        }
+
+        public void run() {
+            setPriority(Thread.MIN_PRIORITY);
+            while (isFullScreen) {
+                mousePoint = MouseInfo.getPointerInfo().getLocation();
+                if (null == oldMousePoint) {
+                    oldMousePoint = mousePoint;
+                }
+                SwingUtilities.convertPointFromScreen(mousePoint, frame);
+                viewPosition = scroller.getViewport().getViewPosition();
+                processButtonsBarVisibility();
+
+                boolean needScrolling = processVScroll() || processHScroll();
+                oldMousePoint = mousePoint;
+                if (needScrolling) {
+                    cancelShowExecutor();
+                    setButtonsBarVisibleFS(false);
+                    makeScrolling(viewPosition);
+                }
+                try {
                     Thread.sleep(100);
                 } catch (Exception e) {
-					// nop
-				}
-			}
-		}
+                    // nop
+                }
+            }
+        }
 
-		private boolean processHScroll() {
-			if (mousePoint.x < FS_SCROLLING_ACTIVE_BORDER) {
-				if (viewPosition.x > 0) {
-					int delta = FS_SCROLLING_ACTIVE_BORDER - mousePoint.x;
-					if (mousePoint.y != oldMousePoint.y) delta *= 2; // speedify scrolling on mouse moving
-					viewPosition.x -= delta;
-					if (viewPosition.x < 0) viewPosition.x = 0;
-					return true;
-				}
-			} else if (mousePoint.x > (frame.getWidth() - FS_SCROLLING_ACTIVE_BORDER)) {
-				final Rectangle viewRect = scroller.getViewport().getViewRect();
-				final int right = viewRect.width + viewRect.x;
-				if (right < outerPanel.getSize().width) {
-					int delta = FS_SCROLLING_ACTIVE_BORDER - (frame.getWidth() - mousePoint.x);
-					if (mousePoint.y != oldMousePoint.y) delta *= 2; // speedify scrolling on mouse moving
-					viewPosition.x += delta;
-					if (viewPosition.x + viewRect.width > outerPanel.getSize().width) viewPosition.x =
-							outerPanel.getSize().width - viewRect.width;
-					return true;
-				}
-			}
-			return false;
-		}
+        private boolean processHScroll() {
+            if (mousePoint.x < FS_SCROLLING_ACTIVE_BORDER) {
+                if (viewPosition.x > 0) {
+                    int delta = FS_SCROLLING_ACTIVE_BORDER - mousePoint.x;
+                    if (mousePoint.y != oldMousePoint.y) {
+                        delta *= 2; // speedify scrolling on mouse moving
+                    }
+                    viewPosition.x -= delta;
+                    if (viewPosition.x < 0) {
+                        viewPosition.x = 0;
+                    }
+                    return true;
+                }
+            } else if (mousePoint.x > (frame.getWidth() - FS_SCROLLING_ACTIVE_BORDER)) {
+                final Rectangle viewRect = scroller.getViewport().getViewRect();
+                final int right = viewRect.width + viewRect.x;
+                if (right < outerPanel.getSize().width) {
+                    int delta = FS_SCROLLING_ACTIVE_BORDER - (frame.getWidth() - mousePoint.x);
+                    if (mousePoint.y != oldMousePoint.y) {
+                        delta *= 2; // speedify scrolling on mouse moving
+                    }
+                    viewPosition.x += delta;
+                    if (viewPosition.x + viewRect.width > outerPanel.getSize().width) {
+                        viewPosition.x
+                                = outerPanel.getSize().width - viewRect.width;
+                    }
+                    return true;
+                }
+            }
+            return false;
+        }
 
-		private boolean processVScroll() {
-			if (mousePoint.y < FS_SCROLLING_ACTIVE_BORDER) {
-				if (viewPosition.y > 0) {
-					int delta = FS_SCROLLING_ACTIVE_BORDER - mousePoint.y;
-					if (mousePoint.x != oldMousePoint.x) delta *= 2; // speedify scrolling on mouse moving
-					viewPosition.y -= delta;
-					if (viewPosition.y < 0) viewPosition.y = 0;
-					return true;
-				}
-			} else if (mousePoint.y > (frame.getHeight() - FS_SCROLLING_ACTIVE_BORDER)) {
-				final Rectangle viewRect = scroller.getViewport().getViewRect();
-				final int bottom = viewRect.height + viewRect.y;
-				if (bottom < outerPanel.getSize().height) {
-					int delta = FS_SCROLLING_ACTIVE_BORDER - (frame.getHeight() - mousePoint.y);
-					if (mousePoint.x != oldMousePoint.x) delta *= 2; // speedify scrolling on mouse moving
-					viewPosition.y += delta;
-					if (viewPosition.y + viewRect.height > outerPanel.getSize().height) viewPosition.y =
-							outerPanel.getSize().height - viewRect.height;
-					return true;
-				}
-			}
-			return false;
-		}
+        private boolean processVScroll() {
+            if (mousePoint.y < FS_SCROLLING_ACTIVE_BORDER) {
+                if (viewPosition.y > 0) {
+                    int delta = FS_SCROLLING_ACTIVE_BORDER - mousePoint.y;
+                    if (mousePoint.x != oldMousePoint.x) {
+                        delta *= 2; // speedify scrolling on mouse moving
+                    }
+                    viewPosition.y -= delta;
+                    if (viewPosition.y < 0) {
+                        viewPosition.y = 0;
+                    }
+                    return true;
+                }
+            } else if (mousePoint.y > (frame.getHeight() - FS_SCROLLING_ACTIVE_BORDER)) {
+                final Rectangle viewRect = scroller.getViewport().getViewRect();
+                final int bottom = viewRect.height + viewRect.y;
+                if (bottom < outerPanel.getSize().height) {
+                    int delta = FS_SCROLLING_ACTIVE_BORDER - (frame.getHeight() - mousePoint.y);
+                    if (mousePoint.x != oldMousePoint.x) {
+                        delta *= 2; // speedify scrolling on mouse moving
+                    }
+                    viewPosition.y += delta;
+                    if (viewPosition.y + viewRect.height > outerPanel.getSize().height) {
+                        viewPosition.y
+                                = outerPanel.getSize().height - viewRect.height;
+                    }
+                    return true;
+                }
+            }
+            return false;
+        }
 
-		private void processButtonsBarVisibility() {
-			if (mousePoint.y < 1) {
-				cancelHideExecutor();
-				// show buttons bar after delay
-				if (! buttonsBar.isVisible && (null == futureForShow || futureForShow.isDone())) {
-					futureForShow = scheduler.schedule(new Runnable() {
-						@Override
-						public void run() {
-							showButtonsBar();
-						}
-					}, SHOW_HIDE_BUTTONS_BAR_DELAY_IN_MILLS, TimeUnit.MILLISECONDS);
-				}
-			} else {
-				cancelShowExecutor();
-			}
-			if (buttonsBar.isVisible && mousePoint.y <= buttonsBar.getHeight()) {
-				cancelHideExecutor();
-			}
-			if (buttonsBar.isVisible && mousePoint.y > buttonsBar.getHeight()) {
-				// hide buttons bar after delay
-				if (null == futureForHide || futureForHide.isDone()) {
-					futureForHide = scheduler.schedule(new Runnable() {
-						@Override
-						public void run() {
-							SwingUtilities.invokeLater(new Runnable() {
-								@Override
-								public void run() {
-									setButtonsBarVisibleFS(false);
-									SwingViewerWindow.this.frame.validate();
-								}
-							});
-						}
-					}, SHOW_HIDE_BUTTONS_BAR_DELAY_IN_MILLS, TimeUnit.MILLISECONDS);
-				}
-			}
-		}
+        private void processButtonsBarVisibility() {
+            if (mousePoint.y < 1) {
+                cancelHideExecutor();
+                // show buttons bar after delay
+                if (!buttonsBar.isVisible && (null == futureForShow || futureForShow.isDone())) {
+                    futureForShow = scheduler.schedule(new Runnable() {
+                        @Override
+                        public void run() {
+                            showButtonsBar();
+                        }
+                    }, SHOW_HIDE_BUTTONS_BAR_DELAY_IN_MILLS, TimeUnit.MILLISECONDS);
+                }
+            } else {
+                cancelShowExecutor();
+            }
+            if (buttonsBar.isVisible && mousePoint.y <= buttonsBar.getHeight()) {
+                cancelHideExecutor();
+            }
+            if (buttonsBar.isVisible && mousePoint.y > buttonsBar.getHeight()) {
+                // hide buttons bar after delay
+                if (null == futureForHide || futureForHide.isDone()) {
+                    futureForHide = scheduler.schedule(new Runnable() {
+                        @Override
+                        public void run() {
+                            SwingUtilities.invokeLater(new Runnable() {
+                                @Override
+                                public void run() {
+                                    setButtonsBarVisibleFS(false);
+                                    SwingViewerWindow.this.frame.validate();
+                                }
+                            });
+                        }
+                    }, SHOW_HIDE_BUTTONS_BAR_DELAY_IN_MILLS, TimeUnit.MILLISECONDS);
+                }
+            }
+        }
 
-		private void cancelHideExecutor() {
-			cancelExecutor(futureForHide);
-		}
-		private void cancelShowExecutor() {
-			cancelExecutor(futureForShow);
-		}
+        private void cancelHideExecutor() {
+            cancelExecutor(futureForHide);
+        }
 
-		private void cancelExecutor(ScheduledFuture<?> future) {
-			if (future != null && ! future.isDone()) {
-				future.cancel(true);
-			}
-		}
+        private void cancelShowExecutor() {
+            cancelExecutor(futureForShow);
+        }
 
-		private void makeScrolling(final Point viewPosition) {
-			SwingUtilities.invokeLater(new Runnable() {
-				@Override
-				public void run() {
-					scroller.getViewport().setViewPosition(viewPosition);
-					final Point mousePosition = surface.getMousePosition();
-					if (mousePosition != null) {
-						final MouseEvent mouseEvent = new MouseEvent(frame, 0, 0, 0,
-								mousePosition.x, mousePosition.y, 0, false);
-						for (MouseMotionListener mml : surface.getMouseMotionListeners()) {
-							mml.mouseMoved(mouseEvent);
-						}
-					}
-				}
-			});
-		}
+        private void cancelExecutor(ScheduledFuture<?> future) {
+            if (future != null && !future.isDone()) {
+                future.cancel(true);
+            }
+        }
 
-		private void showButtonsBar() {
-			SwingUtilities.invokeLater(new Runnable() {
-				@Override
-				public void run() {
-					setButtonsBarVisibleFS(true);
-				}
-			});
-		}
-	}
+        private void makeScrolling(final Point viewPosition) {
+            SwingUtilities.invokeLater(new Runnable() {
+                @Override
+                public void run() {
+                    scroller.getViewport().setViewPosition(viewPosition);
+                    final Point mousePosition = surface.getMousePosition();
+                    if (mousePosition != null) {
+                        final MouseEvent mouseEvent = new MouseEvent(frame, 0, 0, 0,
+                                mousePosition.x, mousePosition.y, 0, false);
+                        for (MouseMotionListener mml : surface.getMouseMotionListeners()) {
+                            mml.mouseMoved(mouseEvent);
+                        }
+                    }
+                }
+            });
+        }
+
+        private void showButtonsBar() {
+            SwingUtilities.invokeLater(new Runnable() {
+                @Override
+                public void run() {
+                    setButtonsBarVisibleFS(true);
+                }
+            });
+        }
+    }
 
     protected void createButtonsPanel(final ProtocolContext context, Container container) {
         final SwingViewerWindow.ButtonsBar buttonsBar = createButtonsBar();
@@ -808,7 +850,6 @@ public class SwingViewerWindow implements IChangeSettingsListener {
 //		JButton fileTransferButton = new JButton(Utils.getButtonIcon("file-transfer"));
 //		fileTransferButton.setMargin(buttonsMargin);
 //		buttonBar.add(fileTransferButton);
-
         buttonsBar.createStrut();
 
         buttonsBar.createButton("close", isApplet ? "Disconnect" : "Close", new ActionListener() {
@@ -847,7 +888,7 @@ public class SwingViewerWindow implements IChangeSettingsListener {
     public void settingsChanged(SettingsChangedEvent e) {
         if (ProtocolSettings.isRfbSettingsChangedFired(e)) {
             ProtocolSettings settings = (ProtocolSettings) e.getSource();
-            setEnabledKbdButtons( ! settings.isViewOnly());
+            setEnabledKbdButtons(!settings.isViewOnly());
         }
     }
 

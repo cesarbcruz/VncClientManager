@@ -75,10 +75,10 @@ public class Viewer extends JApplet implements Runnable, WindowListener {
         if (host != null && port != null && password != null) {
             Parser parser = new Parser();
             ParametersHandler.completeParserOptions(parser);
-            String [] args = new String[3];
-            args[0] = "-host="+host;
-            args[1] = "-port="+port;
-            args[2] = "-password="+password;
+            String[] args = new String[3];
+            args[0] = "-host=" + host;
+            args[1] = "-port=" + port;
+            args[2] = "-password=" + password;
             parser.parse(args);
             if (parser.isSet(ParametersHandler.ARG_HELP)) {
                 printUsage(parser.optionsUsage());
@@ -88,7 +88,14 @@ public class Viewer extends JApplet implements Runnable, WindowListener {
             viewer.systemExit = false;
             SwingUtilities.invokeLater(viewer);
         } else {
-            Viewer viewer = new Viewer();
+            Parser parser = new Parser();
+            ParametersHandler.completeParserOptions(parser);
+            parser.parse(new String[0]);
+            if (parser.isSet(ParametersHandler.ARG_HELP)) {
+                printUsage(parser.optionsUsage());
+                System.exit(0);
+            }
+            Viewer viewer = new Viewer(parser);
             viewer.systemExit = false;
             SwingUtilities.invokeLater(viewer);
         }
@@ -249,7 +256,7 @@ public class Viewer extends JApplet implements Runnable, WindowListener {
             });
         }
 
-        SwingViewerWindowFactory viewerWindowFactory = new SwingViewerWindowFactory(isSeparateFrame, isApplet, this);
+        SwingViewerWindowFactory viewerWindowFactory = new SwingViewerWindowFactory(isSeparateFrame, isApplet, systemExit, this);
 
         connectionPresenter.setConnectionWorkerFactory(
                 new SwingConnectionWorkerFactory(connectionView.getFrame(), passwordFromParams, connectionPresenter, viewerWindowFactory));
